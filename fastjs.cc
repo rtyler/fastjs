@@ -4,8 +4,12 @@
  * Copyright 2009 - R. Tyler Ballance <tyler@monkeypox.org>
  */
 
+#include <cstring>
+#include <cstdio>
 #include <cstdlib>
 #include <unistd.h>
+
+#include <v8.h>
 
 extern "C" {
 	extern char **environ;

@@ -1,6 +1,6 @@
 
-CXXFLAGS = -g -O2 -Wall 
-LDFLAGS = -lfcgi
+CXXFLAGS = -g -O2 -Wall -Iext/include
+LDFLAGS = -lfcgi -Lext/ -lv8_i586_linux
 OUTPUT = fastjs
 
 all::
