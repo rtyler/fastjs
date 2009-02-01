@@ -44,6 +44,8 @@ static void req_handle(FCGX_Stream *out, char **environment)
 
 	FCGX_FPrintF(out, "Our test() JavaScript function returned:\n");
 	FCGX_FPrintF(out, *rc_str);
+
+	PrintEnv(out, "foo", environment);
 }
 
 int main ()
