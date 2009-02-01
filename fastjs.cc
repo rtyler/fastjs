@@ -17,6 +17,8 @@ extern "C" {
 	#include <fcgiapp.h>
 }
 
+using namespace v8; // *puke*
+
 static void PrintEnv(FCGX_Stream *out, char *label, char **envp)
 {
     FCGX_FPrintF(out, "%s:<br>\n<pre>\n", label);
@@ -24,6 +26,24 @@ static void PrintEnv(FCGX_Stream *out, char *label, char **envp)
         FCGX_FPrintF(out, "%s\n", *envp);
     }
     FCGX_FPrintF(out, "</pre><p>\n");
+}
+
+static void req_handle(FCGX_Stream *out, char **environment) 
+{
+	HandleScope scope;
+	Persistent<Context> ctx = Context::New();
+	Context::Scope ctx_scope(ctx);
+
+	Handle<String> source = String::New("(function() { return 'OMG'; })()");
+	Handle<Script> script = Script::Compile(source);
+
+	Handle<Value> rc = script->Run();
+	ctx.Dispose();
+
+	String::AsciiValue rc_str(rc);
+
+	FCGX_FPrintF(out, "Our test() JavaScript function returned:\n");
+	FCGX_FPrintF(out, *rc_str);
 }
 
 int main ()
@@ -39,33 +59,14 @@ int main ()
         FCGX_FPrintF(out,
            "Content-type: text/html\r\n"
            "\r\n"
-           "<title>FastCGI echo (fcgiapp version)</title>"
-           "<h1>FastCGI echo (fcgiapp version)</h1>\n"
+           "<title>FastJS Sample Page"
+           "<h1>FastJS</h1>\n"
            "Request number %d,  Process ID: %d<p>\n", ++count, getpid());
 
         if (contentLength != NULL)
             len = strtol(contentLength, NULL, 10);
-
-        if (len <= 0) {
-            FCGX_FPrintF(out, "No data from standard input.<p>\n");
-        }
-        else {
-            int i, ch;
-
-            FCGX_FPrintF(out, "Standard input:<br>\n<pre>\n");
-            for (i = 0; i < len; i++) {
-                if ((ch = FCGX_GetChar(in)) < 0) {
-                    FCGX_FPrintF(out,
-                        "Error: Not enough bytes received on standard input<p>\n");
-                    break;
-                }
-                FCGX_PutChar(ch, out);
-            }
-            FCGX_FPrintF(out, "\n</pre><p>\n");
-        }
-
-        PrintEnv(out, "Request environment", envp);
-        PrintEnv(out, "Initial environment", environ);
+	
+		req_handle(out, envp);
     } /* while */
 
     return 0;
