@@ -31,6 +31,7 @@ Handle<Value> FastJS_Write(const Arguments& args);
 Handle<Value> FastJS_Load(const Arguments& args);
 
 FCGX_Stream *_current_stream = NULL; /* Unfortunately we need a global to access the stream inside JavaScript callbacks */
+void *_jQuery = NULL; /* Global jQuery buffer to prevent needing to re-read the file per-request */
 
 static void PrintEnv(FCGX_Stream *out, char *label, char **envp)
 {
@@ -41,36 +42,35 @@ static void PrintEnv(FCGX_Stream *out, char *label, char **envp)
     FCGX_FPrintF(out, "</pre><p>\n");
 }
 
-static void *load_jquery() 
+static void *read_file_contents(const char *filepath)
 {
 	struct stat attributes;
 	int fd = 0;
 	int rc = 0;
 
-	rc = stat(JQUERY_FILE, &attributes);
+	rc = stat(filepath, &attributes);
 	if (rc != 0) {
 		/* I should do something with the error here */
 		return NULL;
 	}
-
-	void *jquery = malloc(sizeof(char) * (attributes.st_size + 2));
-	fd = open(JQUERY_FILE, 0);
+	
+	void *buffer = malloc(sizeof(char) * (attributes.st_size + 2));
+	fd = open(filepath, 0);
 	if (fd == 0) {
 		/* I should do something with the error here */
 		close(fd);
 		return NULL;
 	}
-	
-	rc = read(fd, jquery, attributes.st_size); 
+
+	rc= read(fd, buffer, attributes.st_size);
 	close(fd);
-	return jquery;
-}
+	return buffer;
+}	
 
 
 static void req_handle(FCGX_Stream *out, char **environment) 
 {
-	void *jq = load_jquery();
-	if (jq == NULL) {
+	if (_jQuery == NULL) {
 		/* FAIL! */
 		FCGX_FPrintF(out, "FAILED TO PROPERLY LOAD JQUERY!");
 		return;
@@ -86,7 +86,7 @@ static void req_handle(FCGX_Stream *out, char **environment)
 	Handle<Script> prereqs = Script::Compile(prereq);
 	prereqs->Run();
 
-	Handle<String> jquery = String::New((const char *)(jq));
+	Handle<String> jquery = String::New((const char *)(_jQuery));
 	Handle<Script> jqscript = Script::Compile(jquery);
 	jqscript->Run();
 
@@ -110,6 +110,8 @@ int main ()
     FCGX_ParamArray envp;
     int count = 0;
 
+	_jQuery = read_file_contents(JQUERY_FILE);
+
     while (FCGX_Accept(&in, &out, &err, &envp) >= 0) {
 		_current_stream = out;
         char *contentLength = FCGX_GetParam("CONTENT_LENGTH", envp);
@@ -129,6 +131,8 @@ int main ()
 		_current_stream = NULL;
     } /* while */
 
+	if (_jQuery)
+		free(_jQuery);
     return 0;
 }
 
@@ -141,3 +145,28 @@ Handle<Value> FastJS_Write(const Arguments& args)
 	FCGX_FPrintF(_current_stream, "\n");
 	return Undefined();
 }
+/*
+Handle<Value> FastJS_Load(const Arguments& args) {
+	for (int i = 0; i < args.Length(); ++i;) {
+		HandleScope handle_scope;
+		String::Utf8Value file(args[i]);
+		Handle<String> source = String::New(read_file(*file));
+	}
+	return Undefined();
+}
+
+v8::Handle<v8::Value> Load(const v8::Arguments& args) {
+  for (int i = 0; i < args.Length(); i++) {
+    v8::HandleScope handle_scope;
+    v8::String::Utf8Value file(args[i]);
+    v8::Handle<v8::String> source = ReadFile(*file);
+    if (source.IsEmpty()) {
+      return v8::ThrowException(v8::String::New("Error loading file"));
+    }
+    if (!ExecuteString(source, v8::String::New(*file), false, false)) {
+      return v8::ThrowException(v8::String::New("Error executing  file"));
+    }
+  }
+  return v8::Undefined();
+}
+*/

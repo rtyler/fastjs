@@ -1,0 +1,3 @@
+(
+	write("This is totally my test page!");
+)();
