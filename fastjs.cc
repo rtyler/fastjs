@@ -21,13 +21,16 @@ extern "C" {
 	#include <sys/stat.h>
 	#include <fcntl.h>
 	#include <unistd.h>
+
+	#include <glib.h>
 }
 
 using namespace v8; // *puke*
 
 /* Functions that will be exposed into the JavaScript environment */
 Handle<Value> FastJS_Write(const Arguments& args);
-Handle<Value> FastJS_Load(const Arguments& args);
+Handle<Value> FastJS_Source(const Arguments& args);
+Handle<Value> FastJS_Log(const Arguments& args);
 
 /* Unfortunately we need a few global pointers to our current streams for the JavaScript callbacks */
 FCGX_Stream *_in_stream = NULL;
@@ -124,7 +127,8 @@ static void req_handle(FCGX_Stream *out, char **environment)
 	HandleScope scope;
 	Handle<ObjectTemplate> _global = ObjectTemplate::New();
 	_global->Set(String::New("write"), FunctionTemplate::New(FastJS_Write));
-	_global->Set(String::New("load"), FunctionTemplate::New(FastJS_Load));
+	_global->Set(String::New("source"), FunctionTemplate::New(FastJS_Source));
+	_global->Set(String::New("log"), FunctionTemplate::New(FastJS_Log));
 	Persistent<Context> ctx = Context::New(NULL, _global);
 	Context::Scope ctx_scope(ctx);
 
@@ -157,7 +161,7 @@ int main ()
 {
     FCGX_Stream *in, *out, *err;
     FCGX_ParamArray envp;
-    int count = 0;
+    unsigned int count = 0;
 
 	_jQuery = read_file_contents(JQUERY_FILE);
 
@@ -166,14 +170,18 @@ int main ()
 		_error_stream = err;
 		_out_stream = out;
         char *contentLength = FCGX_GetParam("CONTENT_LENGTH", envp);
-        int len = 0;
+        unsigned int len = 0;
 
-        FCGX_FPrintF(out, "Content-type: text/html\r\n\r\n");
+        FCGX_FPrintF(out, "Content-type: text/html\r\nX-FastJS-Request: %d\r\n"
+					"X-FastJS-Process: %d\r\nX-FastJS-Engine: V8\r\n\r\n", ++count, getpid());
 
         if (contentLength != NULL)
             len = strtol(contentLength, NULL, 10);
 	
 		req_handle(out, envp);
+
+		//PrintEnv(err, "Request environment", envp);
+		//PrintEnv(err, "Initial", environ);
 
 		_error_stream = NULL;
 		_in_stream = NULL;
@@ -195,7 +203,7 @@ Handle<Value> FastJS_Write(const Arguments& args)
 	return Undefined();
 }
 
-Handle<Value> FastJS_Load(const Arguments& args) {
+Handle<Value> FastJS_Source(const Arguments& args) {
 	for (int i = 0; i < args.Length(); ++i) {
 		HandleScope scope;
 		String::Utf8Value file(args[i]);
@@ -207,5 +215,16 @@ Handle<Value> FastJS_Load(const Arguments& args) {
 		if (rc != FASTJS_SUCCESS) 
 			return ThrowException(String::New("Error executing the file!"));
 	}
+	return Undefined();
+}
+
+Handle<Value> FastJS_Log(const Arguments& args) {
+	for (int i =0; i < args.Length(); ++i) {
+		HandleScope scope;
+		String::Utf8Value line(args[i]);
+
+		FCGX_FPrintF(_error_stream, "FastJS_Log>> %s\n", *line);
+	}
+
 	return Undefined();
 }
