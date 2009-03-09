@@ -18,7 +18,7 @@ index.dump_attributes = function(title, obj) {
 	for (var k in obj) {
 		fastjs.write(k + " = ");
 
-		if (typeof(obj[k] != "string"))
+		if (typeof(obj[k]) != "string")
 			fastjs.write(typeof(obj[k]));
 		else
 			fastjs.write(obj[k]);
@@ -30,10 +30,13 @@ index.dump_attributes = function(title, obj) {
 (function() {
 	index.header();
 
-	index.dump_attributes("window", window);
-	index.dump_attributes("jQuery", jQuery);
-
 	fastjs.source("pages/test.fjs");
+
+	index.dump_attributes("window", window);
+	index.dump_attributes('location', location);
+	index.dump_attributes("fastjs.env", fastjs.env);
+	index.dump_attributes("fastjs.fcgi_env", fastjs.fcgi_env);
+
 
 	index.footer();
 

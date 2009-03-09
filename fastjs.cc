@@ -116,6 +116,23 @@ static int exec_javascript(const char *script)
 	return FASTJS_SUCCESS;
 }
 
+static void parse_environment(Handle<ObjectTemplate> _node, char **env)
+{
+	for (; *env != NULL; env++) {
+		gchar **splitted = g_strsplit((const gchar *)(*env), "=", 2);
+
+		if (splitted == NULL)
+			continue;
+		if ( (splitted[0] == NULL) || (splitted[1] == NULL) ) {
+			g_strfreev(splitted);
+			continue;
+		}
+
+		_node->Set(String::New((const char *)(splitted[0])), String::New((const char *)(splitted[1])));
+		g_strfreev(splitted);
+	}
+}
+
 static void req_handle(FCGX_Stream *out, char **environment) 
 {
 	if (_jQuery == NULL) {
@@ -127,9 +144,17 @@ static void req_handle(FCGX_Stream *out, char **environment)
 	HandleScope scope;
 	Handle<ObjectTemplate> _global = ObjectTemplate::New();
 	Handle<ObjectTemplate> _fastjs = ObjectTemplate::New();
+	Handle<ObjectTemplate> _env = ObjectTemplate::New();
+	Handle<ObjectTemplate> _fcgi_env = ObjectTemplate::New();
+
+	parse_environment(_env, environment);
+	parse_environment(_fcgi_env, environ);
+
 	_fastjs->Set(String::New("write"), FunctionTemplate::New(FastJS_Write));
 	_fastjs->Set(String::New("source"), FunctionTemplate::New(FastJS_Source));
 	_fastjs->Set(String::New("log"), FunctionTemplate::New(FastJS_Log));
+	_fastjs->Set(String::New("env"), _env);
+	_fastjs->Set(String::New("fcgi_env"), _fcgi_env);
 
 	_global->Set(String::New("fastjs"), _fastjs);
 	Persistent<Context> ctx = Context::New(NULL, _global);
@@ -182,9 +207,6 @@ int main ()
             len = strtol(contentLength, NULL, 10);
 	
 		req_handle(out, envp);
-
-		//PrintEnv(err, "Request environment", envp);
-		//PrintEnv(err, "Initial", environ);
 
 		_error_stream = NULL;
 		_in_stream = NULL;
