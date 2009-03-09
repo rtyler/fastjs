@@ -1,0 +1,44 @@
+  _____                 _         _   ____  
+ |  ___|   __ _   ___  | |_      | | / ___| 
+ | |_     / _` | / __| | __|  _  | | \___ \ 
+ |  _|   | (_| | \__ \ | |_  | |_| |  ___) |
+ |_|      \__,_| |___/  \__|  \___/  |____/ 
+---------------------------------------------
+
+FastJS is currently very experimental, the basic concept however is
+to utilize Google's V8 JavaScript engine to serve up web pages over
+the FastCGI interface.
+
+Currently it's in a "mostly unusable" state as I've not spent the time 
+to properly package libv8.a with the project, so I'm running it via the
+compiled libv8.a inside of the ext/ directory (compiled against Linux 
+2.6 on i586). There is one example script inside of the pages/ folder
+which prints out some basic information and assembles a page (if you're
+that curious as to what this currently looks like).
+
+In addition to the basic JavaScript environment, FastJS preloads jQuery 
+1.3.2 such that the $ function in the JavaScript context properly maps
+to the jQuery root object.
+
+
+In order to get this running, my lighttpd FastCGI configuration currently
+looks something like this:
+
+	$HTTP["host"] == "urlenco.de" {
+		fastcgi.server = (
+			".fjs" => ((
+				"socket" => "/tmp/fcgi-fastjs",
+				"bin-path" => "/home/tyler/source/github/fastjs/fastjs",
+				"max-procs" => 1,
+				"check-local" => "disable",
+				"bin-environment" => (
+				),
+			)))}
+
+	# snip
+	
+	index-file.names += (
+		"index.html", "index.fjs"
+	)
+	static-file.exclude-extensions = ( ".fjs" )
+
