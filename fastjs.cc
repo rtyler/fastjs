@@ -38,15 +38,6 @@ FCGX_Stream *_out_stream = NULL;
 FCGX_Stream *_error_stream = NULL;
 void *_jQuery = NULL; /* Global jQuery buffer to prevent needing to re-read the file per-request */
 
-static void PrintEnv(FCGX_Stream *out, char *label, char **envp)
-{
-    FCGX_FPrintF(out, "%s:<br>\n<pre>\n", label);
-    for( ; *envp != NULL; envp++) {
-        FCGX_FPrintF(out, "%s\n", *envp);
-    }
-    FCGX_FPrintF(out, "</pre><p>\n");
-}
-
 static void *read_file_contents(const char *filepath)
 {
 	struct stat attributes;
