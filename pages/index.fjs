@@ -1,29 +1,29 @@
 var index = new Object();
 
 index.header = function() {
-	write("<html><head><title>FastJS</title></head>");
-	write("<body>");
-	write("<center><h2>FastJS Test Page</h2></center><br/>");
+	fastjs.write("<html><head><title>FastJS</title></head>");
+	fastjs.write("<body>");
+	fastjs.write("<center><h2>FastJS Test Page</h2></center><br/>");
 };
 
 index.footer = function() { 
-	write("</body></html>");
+	fastjs.write("</body></html>");
 };
 
 index.dump_attributes = function(title, obj) {
-	write("<br/><strong>");
-	write(title);
-	write("</strong><br/><hr/>");
+	fastjs.write("<br/><strong>");
+	fastjs.write(title);
+	fastjs.write("</strong><br/><hr/>");
 
 	for (var k in obj) {
-		write(k + " = ");
+		fastjs.write(k + " = ");
 
 		if (typeof(obj[k] != "string"))
-			write(typeof(obj[k]));
+			fastjs.write(typeof(obj[k]));
 		else
-			write(obj[k]);
+			fastjs.write(obj[k]);
 
-		write("<br/>\n");
+		fastjs.write("<br/>\n");
 	}
 };
 
@@ -33,9 +33,9 @@ index.dump_attributes = function(title, obj) {
 	index.dump_attributes("window", window);
 	index.dump_attributes("jQuery", jQuery);
 
-	source("pages/test.fjs");
+	fastjs.source("pages/test.fjs");
 
 	index.footer();
 
-	log("This should go into the error.log");
+	fastjs.log("This should go into the error.log");
 })();

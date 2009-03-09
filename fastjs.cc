@@ -126,9 +126,12 @@ static void req_handle(FCGX_Stream *out, char **environment)
 
 	HandleScope scope;
 	Handle<ObjectTemplate> _global = ObjectTemplate::New();
-	_global->Set(String::New("write"), FunctionTemplate::New(FastJS_Write));
-	_global->Set(String::New("source"), FunctionTemplate::New(FastJS_Source));
-	_global->Set(String::New("log"), FunctionTemplate::New(FastJS_Log));
+	Handle<ObjectTemplate> _fastjs = ObjectTemplate::New();
+	_fastjs->Set(String::New("write"), FunctionTemplate::New(FastJS_Write));
+	_fastjs->Set(String::New("source"), FunctionTemplate::New(FastJS_Source));
+	_fastjs->Set(String::New("log"), FunctionTemplate::New(FastJS_Log));
+
+	_global->Set(String::New("fastjs"), _fastjs);
 	Persistent<Context> ctx = Context::New(NULL, _global);
 	Context::Scope ctx_scope(ctx);
 
