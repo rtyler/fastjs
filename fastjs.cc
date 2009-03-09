@@ -8,8 +8,9 @@
 #include <cstdio>
 #include <cstdlib>
 
-
 #include <v8.h>
+
+#include "fastjs.h"
 
 extern "C" {
 	extern char **environ;
@@ -23,9 +24,6 @@ extern "C" {
 }
 
 using namespace v8; // *puke*
-
-#define JQUERY_FILE "jquery-1.3.2.min.js"
-#define JQUERY_COMPAT "if (typeof(window) == 'undefined'){window=new Object();document=window;self=window;navigator=new Object();navigator.userAgent=navigator.userAgent||'FastJS Server';location=new Object();location.href='file:///dev/null';location.protocol='file:';location.host = 'FastJS';}"
 
 /* Functions that will be exposed into the JavaScript environment */
 Handle<Value> FastJS_Write(const Arguments& args);
@@ -70,8 +68,50 @@ static void *read_file_contents(const char *filepath)
 	rc = read(fd, buffer, attributes.st_size);
 	close(fd);
 	return buffer;
-}	
+}
 
+static void log_exception(FILE *stream, TryCatch *context) 
+{
+	HandleScope scope;
+	String::Utf8Value exception(context->Exception());
+	Handle<Message> message = context->Message();
+
+	if (message.IsEmpty()) {
+		/* V8 didn't pass any extra fancy information back */
+		fprintf(stream, *exception);
+		return;
+	}
+
+	String::Utf8Value filename(message->GetScriptResourceName());
+	int line = message->GetLineNumber();
+	fprintf(stream, "%s:%i: %s\n", *filename, line, *exception);
+
+	String::Utf8Value offender(message->GetSourceLine());
+	fprintf(stream, "\t%s\n", *offender);
+	return;
+}
+
+static int exec_javascript(const char *script) 
+{
+	HandleScope scope;
+	TryCatch exception_ctx;
+
+	Handle<Script> compiled = Script::Compile(String::New(script));
+
+	if (compiled.IsEmpty()) {
+		log_exception(stderr, &exception_ctx);
+		return FASTJS_COMPILE_ERROR;
+	}
+
+	Handle<Value> result = compiled->Run();
+
+	if (result.IsEmpty()) {
+		log_exception(stderr, &exception_ctx);
+		return FASTJS_EXECUTION_ERROR;
+	}
+
+	return FASTJS_SUCCESS;
+}
 
 static void req_handle(FCGX_Stream *out, char **environment) 
 {
@@ -84,16 +124,13 @@ static void req_handle(FCGX_Stream *out, char **environment)
 	HandleScope scope;
 	Handle<ObjectTemplate> _global = ObjectTemplate::New();
 	_global->Set(String::New("write"), FunctionTemplate::New(FastJS_Write));
+	_global->Set(String::New("load"), FunctionTemplate::New(FastJS_Load));
 	Persistent<Context> ctx = Context::New(NULL, _global);
 	Context::Scope ctx_scope(ctx);
 
-	Handle<String> prereq = String::New(JQUERY_COMPAT);
-	Handle<Script> prereqs = Script::Compile(prereq);
-	prereqs->Run();
-
-	Handle<String> jquery = String::New((const char *)(_jQuery));
-	Handle<Script> jqscript = Script::Compile(jquery);
-	jqscript->Run();
+	int rc = 0;
+	rc = exec_javascript(JQUERY_COMPAT);
+	rc = exec_javascript( (const char *)(_jQuery) );
 
 	void *index = read_file_contents("pages/index.fjs");
 	Handle<String> source = String::New( (const char *)(index) );
@@ -107,7 +144,7 @@ static void req_handle(FCGX_Stream *out, char **environment)
 		fprintf(stderr, "\n\n");
 	}
 
-	Handle<Value> rc = script->Run();
+	Handle<Value> results = script->Run();
 	ctx.Dispose();
 
 	/*
@@ -131,10 +168,7 @@ int main ()
         char *contentLength = FCGX_GetParam("CONTENT_LENGTH", envp);
         int len = 0;
 
-        FCGX_FPrintF(out,
-           "Content-type: text/html\r\n"
-           "\r\n"
-		   );
+        FCGX_FPrintF(out, "Content-type: text/html\r\n\r\n");
 
         if (contentLength != NULL)
             len = strtol(contentLength, NULL, 10);
@@ -160,28 +194,18 @@ Handle<Value> FastJS_Write(const Arguments& args)
 	FCGX_FPrintF(_out_stream, "\n");
 	return Undefined();
 }
-/*
+
 Handle<Value> FastJS_Load(const Arguments& args) {
-	for (int i = 0; i < args.Length(); ++i;) {
-		HandleScope handle_scope;
+	for (int i = 0; i < args.Length(); ++i) {
+		HandleScope scope;
 		String::Utf8Value file(args[i]);
-		Handle<String> source = String::New(read_file(*file));
+		void *sourcebuf = read_file_contents(*file);
+
+		if (sourcebuf == NULL)
+			return ThrowException(String::New("Error loading the file!"));
+		int rc = exec_javascript((const char *)(sourcebuf));
+		if (rc != FASTJS_SUCCESS) 
+			return ThrowException(String::New("Error executing the file!"));
 	}
 	return Undefined();
 }
-
-v8::Handle<v8::Value> Load(const v8::Arguments& args) {
-  for (int i = 0; i < args.Length(); i++) {
-    v8::HandleScope handle_scope;
-    v8::String::Utf8Value file(args[i]);
-    v8::Handle<v8::String> source = ReadFile(*file);
-    if (source.IsEmpty()) {
-      return v8::ThrowException(v8::String::New("Error loading file"));
-    }
-    if (!ExecuteString(source, v8::String::New(*file), false, false)) {
-      return v8::ThrowException(v8::String::New("Error executing  file"));
-    }
-  }
-  return v8::Undefined();
-}
-*/

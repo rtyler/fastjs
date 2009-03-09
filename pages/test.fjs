@@ -1,0 +1,3 @@
+(function() {
+	write("<br/><strong>test.fjs was included!</strong><br/>");
+})();
